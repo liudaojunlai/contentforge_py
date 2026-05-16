@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ContentForge Python — Multi-Agent System</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0a0f;--bg2:#111118;--bg3:#16161f;
+  --border:rgba(255,255,255,0.06);--border-h:rgba(255,255,255,0.12);
+  --text:#e8e8f0;--text2:#9090a8;--text3:#5a5a72;
+  --purple:#8b5cf6;--purple-d:rgba(139,92,246,0.15);
+  --cyan:#06b6d4;--cyan-d:rgba(6,182,212,0.12);
+  --amber:#f59e0b;--green:#10b981;--green-d:rgba(16,185,129,0.12);
+  --red:#ef4444;--orange:#f97316;
+  --r:12px;--rs:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+.ambient{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 60% 40% at 20% 10%,rgba(139,92,246,.08) 0%,transparent 60%),
+             radial-gradient(ellipse 50% 40% at 80% 80%,rgba(6,182,212,.06) 0%,transparent 60%)}
+.app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 32px;
+  border-bottom:1px solid var(--border);backdrop-filter:blur(12px);
+  position:sticky;top:0;z-index:100;background:rgba(10,10,15,.9)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--purple),var(--cyan));
+  border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.logo-text{font-size:17px;font-weight:700}
+.logo-text span{background:linear-gradient(90deg,var(--purple),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.badge{font-size:10px;font-weight:500;color:var(--text3);border:1px solid var(--border);
+  border-radius:20px;padding:4px 12px;font-family:'JetBrains Mono',monospace}
+main{flex:1;display:grid;grid-template-columns:370px 1fr}
+.panel-l{border-right:1px solid var(--border);display:flex;flex-direction:column;
+  height:calc(100vh - 73px);position:sticky;top:73px;overflow-y:auto}
+.sec{padding:18px 22px;border-bottom:1px solid var(--border)}
+.sec-title{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.full{grid-column:1/-1}
+label{font-size:11px;color:var(--text2);display:block;margin-bottom:4px}
+select,input[type=text],input[type=password],textarea{
+  width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);
+  border-radius:var(--rs);font-family:'Sora',sans-serif;font-size:12px;padding:8px 10px;outline:none;transition:border-color .2s}
+select:focus,input:focus,textarea:focus{border-color:var(--border-h)}
+input[type=password]{font-family:'JetBrains Mono',monospace;font-size:11px}
+textarea.req{min-height:80px;resize:vertical;line-height:1.6;font-size:13px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.agents-grid{display:flex;flex-direction:column;gap:7px}
+.ac{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border);
+  border-radius:var(--rs);transition:all .3s;position:relative;overflow:hidden}
+.ac.running{border-color:rgba(139,92,246,.4);background:rgba(139,92,246,.05)}
+.ac.done{border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.04)}
+.ac.error{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.04)}
+.ai{font-size:19px;flex-shrink:0}
+.an{flex:1;min-width:0}
+.an-name{font-size:12px;font-weight:600}
+.an-desc{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.as{font-size:10px;font-weight:500;font-family:'JetBrains Mono',monospace;padding:3px 8px;border-radius:20px;
+  background:var(--bg3);color:var(--text3);flex-shrink:0;transition:all .3s}
+.ac.running .as{background:var(--purple-d);color:var(--purple)}
+.ac.done .as{background:var(--green-d);color:var(--green)}
+.ac.error .as{background:rgba(239,68,68,.15);color:var(--red)}
+.ap{position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--purple),transparent);background-size:200% 100%;display:none}
+.ac.running .ap{display:block;animation:sweep 1.4s ease-in-out infinite}
+@keyframes sweep{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* Skill chips */
+.skill-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.skill-chip{font-size:10px;padding:3px 8px;border-radius:20px;border:1px solid var(--border);
+  background:var(--bg3);color:var(--text3);cursor:pointer;transition:all .2s}
+.skill-chip.active{border-color:var(--cyan);background:var(--cyan-d);color:var(--cyan)}
+.btn-run{width:100%;padding:13px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--purple),#7c3aed);color:#fff;
+  font-family:'Sora',sans-serif;font-size:14px;font-weight:600;border-radius:var(--r);transition:all .2s}
+.btn-run:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(139,92,246,.35)}
+.btn-run:disabled{opacity:.4;cursor:not-allowed}
+/* Right panel */
+.panel-r{display:flex;flex-direction:column;height:calc(100vh - 73px);overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 22px;background:var(--bg);position:sticky;top:0;z-index:10}
+.tab{padding:13px 16px;font-size:12px;font-weight:500;color:var(--text3);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab.active{color:var(--text);border-bottom-color:var(--purple)}
+.tab:hover:not(.active){color:var(--text2)}
+.tc{flex:1;overflow-y:auto;padding:22px;display:none}
+.tc.active{display:block}
+/* Empty / Loading */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:360px;gap:14px;text-align:center}
+.empty-icon{font-size:56px;opacity:.2}
+.empty-title{font-size:17px;font-weight:600;color:var(--text2)}
+.empty-sub{font-size:12px;color:var(--text3);line-height:1.7;max-width:300px}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Article */
+.art-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:34px 38px;max-width:760px;margin:0 auto}
+.art-wrap h1{font-size:23px;font-weight:700;line-height:1.4;margin-bottom:22px}
+.art-wrap h2{font-size:17px;font-weight:600;margin:26px 0 10px}
+.art-wrap h3{font-size:14px;font-weight:600;margin:18px 0 8px;color:var(--text)}
+.art-wrap p{font-size:14px;line-height:1.9;color:var(--text2);margin-bottom:14px}
+.art-wrap strong{color:var(--text)}
+.art-wrap ul,.art-wrap ol{padding-left:20px;margin-bottom:14px}
+.art-wrap li{font-size:14px;line-height:1.9;color:var(--text2);margin-bottom:3px}
+.art-actions{display:flex;gap:8px;margin-bottom:18px;max-width:760px;margin-left:auto;margin-right:auto}
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.card h3{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:10px;font-weight:600}
+.card p{font-size:13px;color:var(--text2);line-height:1.7}
+.grid2c{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fullc{grid-column:1/-1}
+.kw-big{font-size:22px;font-weight:700;color:var(--purple)}
+.kw-tags,.tag-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.kw-tag{font-size:11px;padding:3px 9px;border-radius:20px;background:var(--purple-d);color:var(--purple);font-weight:500}
+.tag-it{font-size:11px;padding:3px 9px;border-radius:20px;background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.score-big{font-size:44px;font-weight:700}
+.meta-card{background:var(--bg3);border-radius:var(--rs);padding:12px;margin-bottom:8px}
+.meta-card label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:4px}
+.meta-card p{font-size:12px;color:var(--text2);line-height:1.5}
+/* Skill scores */
+.skill-row{display:grid;grid-template-columns:120px 1fr 50px;align-items:center;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--border)}
+.skill-row:last-child{border-bottom:none}
+.skill-name{font-size:12px;font-weight:500}
+.skill-bar-wrap{background:var(--bg3);border-radius:4px;height:6px;overflow:hidden}
+.skill-bar{height:100%;border-radius:4px;transition:width .8s ease}
+.skill-pct{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text2);text-align:right}
+/* Outline */
+.ol-item{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)}
+.ol-num{width:26px;height:26px;border-radius:7px;flex-shrink:0;background:var(--purple-d);color:var(--purple);
+  font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.ol-body h4{font-size:13px;font-weight:600;margin-bottom:3px}
+.ol-body p{font-size:12px;color:var(--text2);line-height:1.6}
+.ol-meta{font-size:10px;color:var(--text3);margin-top:4px}
+/* Research */
+.res-block{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px}
+.res-block h3{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:10px;font-weight:600}
+.fi{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-bottom:1px solid var(--border)}
+.fi:last-child{border-bottom:none}
+.fi-ico{color:var(--cyan);flex-shrink:0;margin-top:2px}
+.fi-txt{font-size:12px;color:var(--text2);line-height:1.6}
+/* Logs */
+.log-list{font-family:'JetBrains Mono',monospace;font-size:11px}
+.le{display:grid;grid-template-columns:140px 40px 1fr;gap:7px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.le-ts{color:var(--text3)}
+.le-lv{font-weight:600}
+.le-lv.info{color:var(--cyan)}.le-lv.warn{color:var(--amber)}.le-lv.error{color:var(--red)}
+.le-msg{color:var(--text2)}
+/* Buttons */
+.btn{padding:7px 14px;border-radius:var(--rs);border:1px solid var(--border);background:var(--bg2);
+  color:var(--text2);font-family:'Sora',sans-serif;font-size:11px;font-weight:500;cursor:pointer;transition:all .2s;
+  display:inline-flex;align-items:center;gap:5px}
+.btn:hover{border-color:var(--border-h);color:var(--text)}
+.btn-p{background:var(--purple);border-color:var(--purple);color:#fff}
+.btn-p:hover{background:#7c3aed;border-color:#7c3aed;color:#fff}
+.err-banner{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);
+  padding:12px 14px;margin-top:10px;font-size:12px;color:#fca5a5;line-height:1.6;display:none}
+.err-banner.show{display:block}
+.server-status{font-size:10px;padding:3px 9px;border-radius:20px;border:1px solid var(--border);color:var(--text3)}
+.server-status.ok{border-color:rgba(16,185,129,.4);color:var(--green)}
+.server-status.err{border-color:rgba(239,68,68,.3);color:var(--red)}
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+<div class="app">
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏭</div>
+    <div class="logo-text">Content<span>Forge</span> <span style="font-size:11px;color:var(--text3);font-weight:400">Python</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="server-status" id="serverStatus">检查服务器...</div>
+    <div class="badge">LangChain · Harness · Skills</div>
+  </div>
+</header>
+<main>
+<!-- Left -->
+<div class="panel-l">
+  <!-- API Config -->
+  <div class="sec">
+    <div class="sec-title">🔑 API 配置（仅直连模式）</div>
+    <div class="grid2">
+      <div>
+        <label>服务商</label>
+        <select id="provider" onchange="onProvider()">
+          <option value="anthropic">Anthropic</option>
+          <option value="openai">OpenAI</option>
+          <option value="custom">自定义</option>
+        </select>
+      </div>
+      <div>
+        <label>模型（留空用默认）</label>
+        <input type="text" id="model" placeholder="自动">
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <label>API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-ant-... 或 sk-...">
+    </div>
+    <div id="customUrlWrap" style="margin-top:8px;display:none">
+      <label>Custom Base URL</label>
+      <input type="text" id="customUrl" placeholder="https://your-api.com/v1">
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3)">
+      ℹ️ 若已启动 Python 服务器，API Key 由服务器管理，此处可留空。
+    </div>
+  </div>
+
+  <!-- Request -->
+  <div class="sec">
+    <div class="sec-title">📝 创作任务</div>
+    <div>
+      <label>内容需求</label>
+      <textarea class="req" id="userRequest" placeholder="例如：写一篇关于 AI 大模型工程化落地的深度分析，面向技术管理者，要有数据支撑..."></textarea>
+    </div>
+    <div class="row2">
+      <div>
+        <label>目标平台</label>
+        <select id="platform">
+          <option>微信公众号</option><option>知乎</option><option>掘金</option>
+          <option>LinkedIn</option><option>通用媒体</option>
+        </select>
+      </div>
+      <div>
+        <label>写作风格</label>
+        <select id="style">
+          <option>专业干货</option><option>通俗易懂</option>
+          <option>批判性分析</option><option>故事叙述</option><option>学术严谨</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <label>目标字数：<span id="wcLabel">1500</span></label>
+      <input type="range" id="wordCount" min="500" max="5000" step="100" value="1500"
+        style="width:100%;margin-top:4px;accent-color:var(--purple)"
+        oninput="document.getElementById('wcLabel').textContent=this.value">
+    </div>
+
+    <!-- Skill toggles -->
+    <div style="margin-top:10px">
+      <label>💡 挂载 Skills</label>
+      <div class="skill-chips">
+        <div class="skill-chip active" data-skill="word_count" onclick="toggleSkill(this)">字数分析</div>
+        <div class="skill-chip active" data-skill="readability" onclick="toggleSkill(this)">可读性</div>
+        <div class="skill-chip active" data-skill="seo_quality" onclick="toggleSkill(this)">SEO质量</div>
+        <div class="skill-chip active" data-skill="tone_analysis" onclick="toggleSkill(this)">语气分析</div>
+        <div class="skill-chip active" data-skill="format_validator" onclick="toggleSkill(this)">格式校验</div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <button class="btn-run" id="runBtn" onclick="start()">⚡ 启动创作流水线</button>
+    </div>
+    <div class="err-banner" id="errBanner"></div>
+  </div>
+
+  <!-- Agents -->
+  <div class="sec" style="flex:1">
+    <div class="sec-title">🤖 子 Agent 状态</div>
+    <div class="agents-grid" id="agentsGrid"></div>
+  </div>
+</div>
+
+<!-- Right -->
+<div class="panel-r">
+  <div class="tabs">
+    <div class="tab active" onclick="tab('article')">📄 生成文章</div>
+    <div class="tab" onclick="tab('outline')">🗂️ 文章大纲</div>
+    <div class="tab" onclick="tab('research')">🔬 调研素材</div>
+    <div class="tab" onclick="tab('seo')">📈 SEO</div>
+    <div class="tab" onclick="tab('skills')">💡 Skill 报告</div>
+    <div class="tab" onclick="tab('logs')">📋 日志</div>
+  </div>
+
+  <div class="tc active" id="tc-article">
+    <div class="empty" id="artEmpty">
+      <div class="empty-icon">✍️</div>
+      <div class="empty-title">等待创作任务</div>
+      <div class="empty-sub">填写需求，启动流水线，6个 Agent + 5个 Skill 协作生成内容。</div>
+    </div>
+    <div id="artLoading" style="display:none">
+      <div class="empty"><div class="spinner"></div>
+        <div style="color:var(--text2);font-size:13px">正在创作...</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3)" id="loadStep"></div>
+      </div>
+    </div>
+    <div id="artResult" style="display:none">
+      <div class="art-actions">
+        <button class="btn btn-p" onclick="copyArt()">📋 复制全文</button>
+        <button class="btn" onclick="dlArt()">⬇️ 下载 MD</button>
+      </div>
+      <div class="art-wrap" id="artContent"></div>
+    </div>
+  </div>
+
+  <div class="tc" id="tc-outline">
+    <div class="empty" id="olEmpty"><div class="empty-icon">🗂️</div><div class="empty-title">大纲待生成</div></div>
+    <div id="olResult" style="display:none">
+      <div style="margin-bottom:20px">
+        <h2 id="olTitle" style="font-size:21px;font-weight:700;margin-bottom:6px"></h2>
+        <p id="olSub" style="font-size:13px;color:var(--text3)"></p>
+      </div>
+      <div id="olSections"></div>
+    </div>
+  </div>
+
+  <div class="tc" id="tc-research">
+    <div class="empty" id="resEmpty"><div class="empty-icon">🔬</div><div class="empty-title">调研待开始</div></div>
+    <div id="resResult" style="display:none"></div>
+  </div>
+
+  <div class="tc" id="tc-seo">
+    <div class="empty" id="seoEmpty"><div class="empty-icon">📈</div><div class="empty-title">SEO 分析待完成</div></div>
+    <div id="seoResult" style="display:none"></div>
+  </div>
+
+  <div class="tc" id="tc-skills">
+    <div class="empty" id="skillEmpty"><div class="empty-icon">💡</div><div class="empty-title">Skill 报告待生成</div>
+      <div class="empty-sub">5个内置 Skill 将在编辑阶段运行，分析可读性、SEO质量、字数、语气等。</div>
+    </div>
+    <div id="skillResult" style="display:none"></div>
+  </div>
+
+  <div class="tc" id="tc-logs">
+    <div class="empty" id="logEmpty"><div class="empty-icon">📋</div><div class="empty-title">执行日志</div></div>
+    <div class="log-list" id="logList"></div>
+  </div>
+</div>
+</main>
+</div>
+
+<script>
+// ── Provider defaults (for direct browser→API mode)
+const PROVIDERS = {
+  anthropic:{url:'https://api.anthropic.com/v1/messages',model:'claude-sonnet-4-20250514',
+    headers:k=>({'x-api-key':k,'anthropic-version':'2023-06-01','content-type':'application/json'}),
+    body:(msgs,sys,model,max)=>({model,max_tokens:max,system:sys,messages:msgs}),
+    parse:d=>d.content[0].text},
+  openai:{url:'https://api.openai.com/v1/chat/completions',model:'gpt-4o',
+    headers:k=>({'Authorization':`Bearer ${k}`,'content-type':'application/json'}),
+    body:(msgs,sys,model,max)=>({model,max_tokens:max,messages:[{role:'system',content:sys},...msgs]}),
+    parse:d=>d.choices[0].message.content},
+  custom:{url:'',model:'custom',
+    headers:k=>({'Authorization':`Bearer ${k}`,'content-type':'application/json'}),
+    body:(msgs,sys,model,max)=>({model,max_tokens:max,messages:[{role:'system',content:sys},...msgs]}),
+    parse:d=>d.choices?.[0]?.message?.content||d.content?.[0]?.text||''},
+};
+
+const AGENTS = [
+  {id:'topic',    name:'选题策划师',icon:'🎯',desc:'分析需求，策划写作角度'},
+  {id:'research', name:'调研分析师', icon:'🔬',desc:'收集背景知识、数据与案例'},
+  {id:'outline',  name:'结构设计师', icon:'🗂️',desc:'设计文章骨架与章节逻辑'},
+  {id:'writer',   name:'内容撰写师', icon:'✍️',desc:'依据大纲和素材生成正文'},
+  {id:'editor',   name:'资深编辑',   icon:'✏️',desc:'润色语言，提升表达质量'},
+  {id:'seo',      name:'SEO 优化师', icon:'📈',desc:'提取关键词，生成Meta信息'},
+];
+
+const SKILLS_ALL = [
+  {id:'word_count',       label:'字数分析',  color:'#06b6d4'},
+  {id:'readability',      label:'可读性',    color:'#8b5cf6'},
+  {id:'seo_quality',      label:'SEO质量',   color:'#f97316'},
+  {id:'tone_analysis',    label:'语气分析',  color:'#10b981'},
+  {id:'format_validator', label:'格式校验',  color:'#f59e0b'},
+];
+
+// State
+let _article = '';
+let _serverMode = false;
+let _pollTimer = null;
+
+// ── Init ──────────────────────────────────────
+renderAgents({});
+checkServer();
+
+async function checkServer() {
+  try {
+    const r = await fetch('/api/status', {signal: AbortSignal.timeout(2000)});
+    if (r.ok) {
+      const d = await r.json();
+      _serverMode = true;
+      document.getElementById('serverStatus').textContent = `✓ 服务器已连接 (${d.provider})`;
+      document.getElementById('serverStatus').className = 'server-status ok';
+    }
+  } catch {
+    document.getElementById('serverStatus').textContent = '直连模式';
+  }
+}
+
+function onProvider() {
+  const p = document.getElementById('provider').value;
+  document.getElementById('customUrlWrap').style.display = p==='custom'?'block':'none';
+}
+
+function toggleSkill(el) {
+  el.classList.toggle('active');
+}
+
+function getActiveSkills() {
+  return [...document.querySelectorAll('.skill-chip.active')].map(e=>e.dataset.skill);
+}
+
+// ── Tab ───────────────────────────────────────
+function tab(name) {
+  const names = ['article','outline','research','seo','skills','logs'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active', names[i]===name));
+  document.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  document.getElementById(`tc-${name}`).classList.add('active');
+}
+
+// ── Render agents ─────────────────────────────
+function renderAgents(statuses) {
+  const g = document.getElementById('agentsGrid');
+  g.innerHTML = AGENTS.map(a=>{
+    const st = statuses[a.id]||'idle';
+    const stLabel = {idle:'待机',running:'运行中',done:'✓ 完成',error:'✗ 错误'}[st]||'待机';
+    return `<div class="ac ${st}" id="ac-${a.id}">
+      <div class="ai">${a.icon}</div>
+      <div class="an"><div class="an-name">${a.name}</div><div class="an-desc">${a.desc}</div></div>
+      <div class="as">${stLabel}</div>
+      <div class="ap"></div>
+    </div>`;
+  }).join('');
+}
+
+function setAgent(id, st) {
+  const card = document.getElementById(`ac-${id}`);
+  if (!card) return;
+  card.className = `ac ${st}`;
+  card.querySelector('.as').textContent = {idle:'待机',running:'运行中',done:'✓ 完成',error:'✗ 错误'}[st]||'待机';
+}
+
+function showArticle(state) {
+  document.getElementById('artEmpty').style.display   = state==='empty'  ?'flex':'none';
+  document.getElementById('artLoading').style.display = state==='loading'?'block':'none';
+  document.getElementById('artResult').style.display  = state==='result' ?'block':'none';
+}
+
+function showErr(msg) {
+  const el=document.getElementById('errBanner');
+  el.textContent='⚠️ '+msg; el.classList.add('show');
+}
+
+function addLog(ts, level, msg) {
+  document.getElementById('logEmpty').style.display='none';
+  const d=document.createElement('div'); d.className='le';
+  const time=(ts||'').replace('T',' ').slice(0,19)||new Date().toISOString().slice(0,19);
+  d.innerHTML=`<span class="le-ts">${time}</span><span class="le-lv ${level}">${level.toUpperCase()}</span><span class="le-msg">${msg}</span>`;
+  const l=document.getElementById('logList');
+  l.appendChild(d); l.scrollTop=l.scrollHeight;
+}
+
+// ── Start ─────────────────────────────────────
+async function start() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const req    = document.getElementById('userRequest').value.trim();
+  document.getElementById('errBanner').classList.remove('show');
+
+  if (!req) { showErr('请填写内容需求'); return; }
+  if (!_serverMode && !apiKey) { showErr('请填入 API Key，或启动 Python 服务器'); return; }
+
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('logList').innerHTML = '';
+  renderAgents({});
+  showArticle('loading');
+
+  if (_serverMode && !apiKey) {
+    await startServerMode(req);
+  } else {
+    await startDirectMode(req, apiKey);
+  }
+
+  document.getElementById('runBtn').disabled = false;
+}
+
+// ── Server mode: POST /api/create then poll ───
+async function startServerMode(req) {
+  const body = {
+    userRequest: req,
+    platform:  document.getElementById('platform').value,
+    style:     document.getElementById('style').value,
+    wordCount: parseInt(document.getElementById('wordCount').value),
+  };
+
+  addLog('', 'info', '通过服务器启动 Pipeline...');
+  document.getElementById('loadStep').textContent = '发送请求到服务器...';
+
+  try {
+    const r = await fetch('/api/create/sync', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
+    });
+    if (!r.ok) { const e=await r.text(); throw new Error(e); }
+    const data = await r.json();
+    renderFromResult(data);
+    addLog('', 'info', '服务器 Pipeline 完成');
+  } catch(e) {
+    showErr(e.message);
+    showArticle('empty');
+  }
+}
+
+// ── Direct mode: browser calls LLM directly ──
+const AGENT_SYSTEMS = {
+  topic:`你是资深内容策划师。分析用户需求，提炼最佳写作角度。输出格式（严格JSON，不加任何其他文字）：{"topic":"最终主题","angle":"写作角度","hook":"钩子句","audience":"受众","alternatives":["备选1","备选2"]}`,
+  research:`你是专业内容调研分析师。输出格式（JSON）：{"background":"背景摘要","keyFacts":["事实1","事实2"],"cases":["案例1"],"misconceptions":["误区1"],"definitions":{"概念":"定义"}}`,
+  outline:`你是内容结构设计师。输出格式（JSON）：{"title":"标题","subtitle":"副标题","intro":"引言思路","sections":[{"heading":"章节标题","point":"核心论点","materials":["素材"],"wordCount":300}],"conclusion":"结尾","totalWords":1500}`,
+  writer:`你是顶级内容创作者。按大纲撰写Markdown全文，从#标题开始直接输出。`,
+  editor:`你是资深文字编辑。润色文章，直接输出Markdown，不加说明。`,
+  seo:`你是SEO优化师。输出格式（JSON）：{"primaryKeyword":"主词","longtailKeywords":["词1","词2","词3","词4","词5"],"metaTitle":"...","metaDescription":"...","ogTitle":"...","tags":["标1","标2","标3","标4","标5"],"seoScore":85,"suggestions":["建议1","建议2"]}`,
+};
+
+async function callLLM(sys, userMsg, maxTokens=2000) {
+  const prov = document.getElementById('provider').value;
+  const key  = document.getElementById('apiKey').value.trim();
+  const mdl  = document.getElementById('model').value.trim();
+  const cfg  = PROVIDERS[prov];
+  if (prov==='custom') cfg.url = document.getElementById('customUrl').value.trim()+'/chat/completions';
+  const model = mdl || cfg.model;
+  const msgs  = [{role:'user',content:userMsg}];
+  if (prov==='custom') {
+    const input = document.getElementById('customUrl').value.trim();
+    if (input.endsWith('/chat/completions')) cfg.url = input;
+    else cfg.url = input.replace(/\/+$/,'') + '/chat/completions';
+  }
+  const r = await fetch(cfg.url, {method:'POST', headers:cfg.headers(key),
+    body:JSON.stringify(cfg.body(msgs,sys,model,maxTokens))});
+  if (!r.ok) throw new Error(`API [${r.status}]: ${(await r.text()).slice(0,200)}`);
+  return cfg.parse(await r.json());
+}
+
+function safeJSON(txt, fallback={}) {
+  try { return JSON.parse(txt.trim().replace(/^```json\s*/,'').replace(/```\s*$/,'')); }
+  catch { const m=txt.match(/\{[\s\S]+\}/); if(m){try{return JSON.parse(m[0]);}catch{}} return fallback; }
+}
+
+let _ctx = {};
+
+async function startDirectMode(req) {
+  _ctx = {
+    userRequest: req,
+    platform: document.getElementById('platform').value,
+    style: document.getElementById('style').value,
+    wordCount: parseInt(document.getElementById('wordCount').value),
+  };
+
+  const steps = [
+    {id:'topic',    maxT:800,  msg:()=>`用户需求：${_ctx.userRequest}\n平台：${_ctx.platform}\n风格：${_ctx.style}\n请策划最佳选题，输出JSON。`, post: r=>{_ctx.topicResult=safeJSON(r)}},
+    {id:'research', maxT:1200, msg:()=>{const t=_ctx.topicResult||{};return`主题：${t.topic||_ctx.userRequest}\n角度：${t.angle||''}\n受众：${t.audience||''}\n请调研，输出JSON。`}, post:r=>{_ctx.researchResult=safeJSON(r)}},
+    {id:'outline',  maxT:900,  msg:()=>{const t=_ctx.topicResult||{},rs=_ctx.researchResult||{};return`选题：${t.topic}\n角度：${t.angle}\n受众：${t.audience}\n钩子：${t.hook}\n背景：${rs.background||''}\n数据：${(rs.keyFacts||[]).join('；')}\n目标字数：${_ctx.wordCount}\n风格：${_ctx.style}\n输出大纲JSON。`}, post:r=>{_ctx.outlineResult=safeJSON(r)}},
+    {id:'writer',   maxT:2800, msg:()=>{const t=_ctx.topicResult||{},rs=_ctx.researchResult||{},o=_ctx.outlineResult||{};return`标题：${o.title}\n钩子：${t.hook}\n大纲：${JSON.stringify(o.sections||[])}\n数据：${(rs.keyFacts||[]).join('\n')}\n案例：${(rs.cases||[]).join('\n')}\n背景：${(rs.background||'').slice(0,300)}\n风格：${_ctx.style}\n目标字数：${o.totalWords||_ctx.wordCount}\n输出完整Markdown文章。`}, post:r=>{_ctx.writerResult=r}},
+    {id:'editor',   maxT:3000, msg:()=>`请润色以下文章，风格：${_ctx.style}\n受众：${(_ctx.topicResult||{}).audience||''}\n\n${_ctx.writerResult}`, post:r=>{_ctx.editorResult=r; renderArticle(r)}},
+    {id:'seo',      maxT:800,  msg:()=>{const t=_ctx.topicResult||{};return`主题：${t.topic}\n受众：${t.audience||''}\n文章（前1000字）：${(_ctx.editorResult||'').slice(0,1000)}\n输出SEO JSON。`}, post:r=>{_ctx.seoResult=safeJSON(r)}},
+  ];
+
+  for (const step of steps) {
+    setAgent(step.id, 'running');
+    document.getElementById('loadStep').textContent = `${AGENTS.find(a=>a.id===step.id)?.icon} ${AGENTS.find(a=>a.id===step.id)?.name} 工作中...`;
+    addLog('', 'info', `启动 [${step.id}]`);
+    try {
+      const raw = await callLLM(AGENT_SYSTEMS[step.id], step.msg(), step.maxT);
+      step.post(raw);
+      setAgent(step.id, 'done');
+      addLog('', 'info', `[${step.id}] 完成`);
+      // partial renders
+      if (step.id==='outline') renderOutline(_ctx.outlineResult);
+      if (step.id==='research') renderResearch(_ctx.researchResult);
+      if (step.id==='seo') renderSEO(_ctx.seoResult);
+    } catch(e) {
+      setAgent(step.id, 'error');
+      addLog('', 'error', `[${step.id}] 失败: ${e.message}`);
+      showErr(`[${step.id}] 失败: ${e.message}`);
+      showArticle('empty'); return;
+    }
+  }
+  // Run client-side skills
+  runClientSkills();
+  showArticle('result');
+  addLog('', 'info', 'Pipeline 完成 ✓');
+}
+
+function renderFromResult(data) {
+  if (data.outline)  renderOutline(data.outline);
+  if (data.research) renderResearch(data.research);
+  if (data.seo)      renderSEO(data.seo);
+  if (data.article)  renderArticle(data.article);
+  if (data.skills)   renderSkills(data.skills);
+  if (data.agentStatuses) {
+    const statuses = {};
+    (data.agentStatuses||[]).forEach(a=>statuses[a.id]=a.status);
+    renderAgents(statuses);
+  }
+  showArticle('result');
+}
+
+// ── Client-side skill simulation ─────────────
+function runClientSkills() {
+  const text = _ctx.editorResult || _ctx.writerResult || '';
+  const active = getActiveSkills();
+  const results = {};
+
+  if (active.includes('word_count')) {
+    const words = (text.match(/\S+/g)||[]).length;
+    const target = _ctx.wordCount;
+    const ratio = Math.min(words/target,1);
+    results.word_count = {score:Math.max(0,1-Math.abs(1-ratio)*.5),annotations:[`共约 ${words} 词`,`目标达成率 ${(ratio*100).toFixed(0)}%`]};
+  }
+  if (active.includes('readability')) {
+    const sents = text.split(/[。！？.!?]+/).filter(s=>s.length>5);
+    const avg = sents.reduce((a,s)=>a+s.length,0)/Math.max(sents.length,1);
+    const transitions = (text.match(/因此|所以|但是|然而|此外|另外|首先|其次|最后|总之/g)||[]).length;
+    const longR = sents.filter(s=>s.length>100).length/Math.max(sents.length,1);
+    const score = Math.max(0,Math.min(1,0.6-longR*.4+Math.min(transitions/10,.3)));
+    results.readability = {score,annotations:[`平均句长 ${avg.toFixed(0)} 字`,`过渡词 ${transitions} 处`,`可读性 ${(score*100).toFixed(0)}%`]};
+  }
+  if (active.includes('seo_quality')) {
+    const seo = _ctx.seoResult||{};
+    const kw = seo.primaryKeyword||'';
+    const kwCount = kw?text.toLowerCase().split(kw.toLowerCase()).length-1:0;
+    const h2 = (text.match(/^##\s/gm)||[]).length;
+    const score = Math.min(1,(!kw?.length?.0:.2)+(h2>=2?.2:0)+Math.min(kwCount*.05,.25)+(seo.metaDescription?.15:0)+((text.match(/\S+/g)||[]).length>=1000?.2:.1));
+    results.seo_quality = {score,annotations:[`关键词出现 ${kwCount} 次`,`H2标题 ${h2} 个`,`SEO质量 ${(score*100).toFixed(0)}%`]};
+  }
+  if (active.includes('tone_analysis')) {
+    const style = _ctx.style||'专业干货';
+    const styleMap = {'专业干货':['数据','研究','分析','结论','因此'],'批判性分析':['然而','但是','值得注意','局限'],'通俗易懂':['比如','就是说','举个例子'],'故事叙述':['突然','那天','后来','最终']};
+    const words = styleMap[style]||styleMap['专业干货'];
+    const hits = words.reduce((a,w)=>a+text.split(w).length-1,0);
+    const score = Math.min(1,hits*.1+.4);
+    results.tone_analysis = {score,annotations:[`目标风格: ${style}`,`风格信号词 ${hits} 处`,`一致性 ${(score*100).toFixed(0)}%`]};
+  }
+  if (active.includes('format_validator')) {
+    const h1 = /^#\s/m.test(text);
+    const h2 = /^##\s/m.test(text);
+    const paras = text.split(/\n\n/).filter(p=>p.trim()).length>=2;
+    const score = (h1?.4:0)+(h2?.3:0)+(paras?.3:0);
+    results.format_validator = {score,annotations:[`H1: ${h1?'✓':'✗'}`,`H2: ${h2?'✓':'✗'}`,`多段落: ${paras?'✓':'✗'}`]};
+  }
+
+  renderSkills(results);
+}
+
+// ── Render functions ─────────────────────────
+function md2html(md){
+  return (md||'')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/^## (.+)$/gm,'<h2>$2</h2>'.replace('$2','$1'))
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g,s=>`<ul>${s}</ul>`)
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/^(?!<[hul])(.+)$/gm,'<p>$1</p>')
+    .replace(/<p><\/p>/g,'');
+}
+
+function renderArticle(md) {
+  _article = md;
+  document.getElementById('artContent').innerHTML = md2html(md);
+  showArticle('result');
+}
+
+function renderOutline(ol) {
+  if (!ol?.sections) return;
+  document.getElementById('olEmpty').style.display='none';
+  document.getElementById('olResult').style.display='block';
+  document.getElementById('olTitle').textContent  = ol.title||'';
+  document.getElementById('olSub').textContent    = ol.subtitle||'';
+  document.getElementById('olSections').innerHTML = (ol.sections||[]).map((s,i)=>`
+    <div class="ol-item">
+      <div class="ol-num">${i+1}</div>
+      <div class="ol-body">
+        <h4>${s.heading||''}</h4>
+        <p>${s.point||''}</p>
+        ${s.wordCount?`<div class="ol-meta">预计 ${s.wordCount} 字</div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+function renderResearch(rs) {
+  if (!rs) return;
+  document.getElementById('resEmpty').style.display='none';
+  const el = document.getElementById('resResult'); el.style.display='block';
+  const fi = items => items.map(f=>`<div class="fi"><div class="fi-ico">◆</div><div class="fi-txt">${f}</div></div>`).join('');
+  el.innerHTML = `
+    <div class="res-block"><h3>📚 背景知识</h3><p style="font-size:13px;color:var(--text2);line-height:1.8">${rs.background||''}</p></div>
+    ${rs.keyFacts?.length?`<div class="res-block"><h3>📊 关键数据</h3>${fi(rs.keyFacts)}</div>`:''}
+    ${rs.cases?.length?`<div class="res-block"><h3>💡 典型案例</h3>${fi(rs.cases)}</div>`:''}
+    ${rs.misconceptions?.length?`<div class="res-block"><h3>⚠️ 常见误区</h3>${fi(rs.misconceptions)}</div>`:''}`;
+}
+
+function renderSEO(seo) {
+  if (!seo) return;
+  document.getElementById('seoEmpty').style.display='none';
+  const el=document.getElementById('seoResult'); el.style.display='block';
+  const sc=seo.seoScore||0;
+  const col=sc>=80?'var(--green)':sc>=60?'var(--amber)':'var(--red)';
+  el.innerHTML=`
+    <div class="grid2c">
+      <div class="card"><h3>🎯 主关键词</h3><div class="kw-big">${seo.primaryKeyword||'-'}</div>
+        <div class="kw-tags">${(seo.longtailKeywords||[]).map(k=>`<span class="kw-tag">${k}</span>`).join('')}</div></div>
+      <div class="card"><h3>📊 SEO 评分</h3>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div class="score-big" style="color:${col}">${sc}</div>
+          <div><div style="font-size:13px;color:var(--text2)">${sc>=80?'优秀':sc>=60?'良好':'需优化'}</div><div style="font-size:11px;color:var(--text3)">/ 100</div></div>
+        </div>
+        ${seo.suggestions?.length?`<ul style="margin-top:10px;padding-left:14px">${seo.suggestions.map(s=>`<li style="font-size:12px;color:var(--text2);margin-bottom:5px">${s}</li>`).join('')}</ul>`:''}
+      </div>
+      <div class="card fullc"><h3>🏷️ Meta 信息</h3>
+        <div class="meta-card"><label>Meta Title</label><p>${seo.metaTitle||'-'}</p></div>
+        <div class="meta-card"><label>Meta Description</label><p>${seo.metaDescription||'-'}</p></div>
+        <div class="meta-card"><label>OG Title</label><p>${seo.ogTitle||'-'}</p></div>
+      </div>
+      <div class="card fullc"><h3>🏷️ 标签</h3>
+        <div class="tag-row">${(seo.tags||[]).map(t=>`<span class="tag-it">${t}</span>`).join('')}</div></div>
+    </div>`;
+}
+
+function renderSkills(skills) {
+  if (!skills||!Object.keys(skills).length) return;
+  document.getElementById('skillEmpty').style.display='none';
+  const el=document.getElementById('skillResult'); el.style.display='block';
+  const SKILL_LABELS={'word_count':'字数分析','readability':'可读性','seo_quality':'SEO质量','seo':'SEO质量','tone_analysis':'语气分析','format_validator':'格式校验'};
+  const SKILL_COLORS={'word_count':'#06b6d4','readability':'#8b5cf6','seo_quality':'#f97316','seo':'#f97316','tone_analysis':'#10b981','format_validator':'#f59e0b'};
+  
+  el.innerHTML = `<div class="card" style="margin-bottom:16px">
+    <h3>💡 Skill 分析报告</h3>
+    <div style="margin-top:10px">
+    ${Object.entries(skills).map(([k,v])=>{
+      const data = typeof v==='object'&&v!==null?v:{};
+      const score = data.score!==undefined?data.score:(data.data?.score||0);
+      const scoreN = typeof score==='number'?score:0;
+      const pct = (scoreN*100).toFixed(0);
+      const col = SKILL_COLORS[k]||'#8b5cf6';
+      const label = SKILL_LABELS[k]||k;
+      const annotations = data.annotations||(data.data?.annotations)||[];
+      return `<div class="skill-row">
+        <div class="skill-name">${label}</div>
+        <div class="skill-bar-wrap"><div class="skill-bar" style="width:${pct}%;background:${col}"></div></div>
+        <div class="skill-pct">${pct}%</div>
+      </div>
+      ${annotations.length?`<div style="padding:4px 0 8px 130px">${annotations.slice(0,3).map(a=>`<div style="font-size:11px;color:var(--text3);margin-top:2px">• ${a}</div>`).join('')}</div>`:''}`;
+    }).join('')}
+    </div>
+  </div>`;
+}
+
+function copyArt() {
+  navigator.clipboard.writeText(_article).then(()=>{
+    const b=event.target; const o=b.textContent; b.textContent='✓ 已复制'; setTimeout(()=>b.textContent=o,2000);
+  });
+}
+function dlArt() {
+  const blob=new Blob([_article],{type:'text/markdown'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='article.md'; a.click();
+}
+</script>
+</body>
+</html>
